@@ -2,11 +2,12 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import warnings
+import requests
 
 # Suppress warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
-# --- CORE MATH LOGIC (Same as before) ---
+# --- CORE MATH LOGIC ---
 def calculate_indicators(df):
     close_prices = df['Close'].squeeze()
     
@@ -49,12 +50,11 @@ st.set_page_config(page_title="Pro Market Scanner", layout="wide")
 st.title("📈 Live Market & Forex Scanner")
 st.markdown("Search for any NSE, BSE, or Forex ticker to instantly calculate moving average signals.")
 
-# The Search Bar
 col1, col2 = st.columns([3, 1])
 with col1:
     search_query = st.text_input("Enter Ticker (e.g., RELIANCE.NS, TCS.BO, USDINR=X, AAPL)", "RELIANCE.NS").upper()
 with col2:
-    st.markdown("<br>", unsafe_allow_html=True) # Spacing
+    st.markdown("<br>", unsafe_allow_html=True) 
     analyze_button = st.button("Analyze Asset")
 
 st.markdown("---")
@@ -62,26 +62,29 @@ st.markdown("---")
 if analyze_button or search_query:
     try:
         with st.spinner(f"Fetching live data for {search_query}..."):
-            ticker = yf.Ticker(search_query)
-            # Fetch 5 days of 1-minute data
-            df = ticker.history(period="5d", interval="1m")
+            # STEALTH MODE: Trick Yahoo into thinking we are a normal Chrome browser
+            session = requests.Session()
+            session.headers.update({
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Safari/537.36'
+            })
+            
+            ticker = yf.Ticker(search_query, session=session)
+            # Fetch 5 days of 5-minute data (less likely to be blocked than 1m data)
+            df = ticker.history(period="5d", interval="5m")
             
             if df.empty or len(df) < 50:
-                st.error(f"Could not find enough 1-minute data for '{search_query}'. Check the spelling or try a different timeframe.")
+                st.error(f"Could not find enough data for '{search_query}'. The market might be closed, or the ticker is incorrect.")
             else:
-                # Do the math
                 df = calculate_indicators(df)
                 signal, price = generate_signal(df)
                 
-                # Display Results in big metric boxes
                 st.subheader(f"Results for: {search_query}")
                 m1, m2, m3 = st.columns(3)
                 m1.metric("Current Price", f"{price:,.2f}")
                 m2.metric("Trading Signal", signal)
                 m3.metric("Current RSI", f"{df['RSI'].iloc[-1]:.2f}")
                 
-                # Show a mini price chart
-                st.markdown("### Recent Price Action (1-Minute Candles)")
+                st.markdown("### Recent Price Action (5-Minute Candles)")
                 st.line_chart(df['Close'])
 
     except Exception as e:
