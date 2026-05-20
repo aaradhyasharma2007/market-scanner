@@ -2,7 +2,6 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import warnings
-import requests
 
 # Suppress warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -62,14 +61,9 @@ st.markdown("---")
 if analyze_button or search_query:
     try:
         with st.spinner(f"Fetching live data for {search_query}..."):
-            # STEALTH MODE: Trick Yahoo into thinking we are a normal Chrome browser
-            session = requests.Session()
-            session.headers.update({
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Safari/537.36'
-            })
-            
-            ticker = yf.Ticker(search_query, session=session)
-            # Fetch 5 days of 5-minute data (less likely to be blocked than 1m data)
+            # We let yfinance handle the stealth connection automatically now!
+            ticker = yf.Ticker(search_query)
+            # Fetch 5 days of 5-minute data (the sweet spot for stability)
             df = ticker.history(period="5d", interval="5m")
             
             if df.empty or len(df) < 50:
